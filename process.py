@@ -90,18 +90,20 @@ tcd_long = pd.wide_to_long(tcd, stubnames=['No. of Properties', 'No. of Vacant P
 tcd_long['Date'] = pd.to_datetime(tcd_long['Date'], format='%d %B %Y')
 # Calculate number of non-vacant properties
 tcd_long['No. of Non-Vacant Properties'] = tcd_long['No. of Properties'] - tcd_long['No. of Vacant Properties']
-# %% Multiply % by 100 for display purposes
+# Multiply % by 100 for display purposes
 tcd_long['% of Vacant Properties'] = tcd_long['% of Vacant Properties'] * 100
-
-# %% Output to CSV
+# Clean up capitalisation
+tcd_long.rename(columns={'TOWN CENTRE': 'Town Centre'}, inplace=True)
+tcd_long['Town Centre'] = tcd_long['Town Centre'].str.title()
+# Output to CSV
 tcd_long.to_csv('data/tcd-non-domestic-property-vacancy-rates.csv')
 
 # %%
-tcd_raw = pd.melt(tcd_long, id_vars=['TOWN CENTRE', 'Date'], var_name='Metric', value_name='Value').pivot(index=['Date', 'Metric'], columns='TOWN CENTRE', values='Value')
+tcd_raw = pd.melt(tcd_long, id_vars=['Town Centre', 'Date'], var_name='Metric', value_name='Value').pivot(index=['Date', 'Metric'], columns='Town Centre', values='Value')
 tcd_raw.to_csv('data/tcd-non-domestic-property-vacancy-rates-wide.csv')
 
 # %%
-tcd_ratios = compare_to_start_date(tcd_long, ['No. of Properties','No. of Vacant Properties','No. of Non-Vacant Properties'], 'TOWN CENTRE', ['Change in Total', 'Change in Vacant', 'Change in Non-Vacant'], 'data/tcd-non-domestic-properties-ratios.csv').reset_index()
+tcd_ratios = compare_to_start_date(tcd_long, ['No. of Properties','No. of Vacant Properties','No. of Non-Vacant Properties'], 'Town Centre', ['Change in Total', 'Change in Vacant', 'Change in Non-Vacant'], 'data/tcd-non-domestic-properties-ratios.csv').reset_index()
 
 # %%
 most_recent = tcd_ratios[tcd_ratios['Date'] == tcd_ratios['Date'].max()]
