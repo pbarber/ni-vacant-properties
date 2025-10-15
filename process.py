@@ -26,20 +26,16 @@ def download_file_if_not_exists(url, fname=None, jsonkey=None):
 dom = pd.read_csv('data/domestic-property-vacancy-rates-by-district-council.csv')
 nondom = pd.read_csv('data/non-domestic-property-vacancy-rates-by-district-council.csv')
 all = pd.read_csv('data/property-vacancy-rates-by-district-council.csv')
-
-# %% Convert dates to usable format
+# Convert dates to usable format
 dom['Date'] = pd.to_datetime(dom['Date'].str.replace(r'(\d)(st|nd|rd|th)', r'\1', regex=True), format='%d %B %Y')
 nondom['Date'] = pd.to_datetime(nondom['Date'].str.replace(r'(\d)(st|nd|rd|th)', r'\1', regex=True), format='%d %B %Y')
 all['Date'] = pd.to_datetime(all['Date'].str.replace(r'(\d)(st|nd|rd|th)', r'\1', regex=True), format='%d %B %Y')
-
-# %% Combine the three datasets into one
+# Combine the three datasets into one
 full = pd.merge(dom, nondom, on=['Date', 'District Council'], how='outer')
 full = pd.merge(full, all, on=['Date', 'District Council'], how='outer')
-
-# %% Output a combined CSV
+# Output a combined CSV
 full.to_csv('data/property-vacancy-rates-by-district-council-combined.csv', index=False)
 
-# %%
 # %%
 full.pivot(
     index='Date', 
@@ -55,27 +51,18 @@ full.pivot(
 
 # %%
 # Calculate ratio of non-domestic properties compared to first period for each council
-first_period = full.sort_values('Date').groupby('District Council')['Number of Non-Domestic Properties'].transform('first')
-full['Non-Domestic Properties Ratio'] = (full['Number of Non-Domestic Properties'] / first_period) - 1
+def compare_to_start_date(df, metric, group_by, name, filename):
+    first_period = df.sort_values('Date').groupby(group_by)[metric].transform('first')
+    df[name] = (df[metric] / first_period) - 1
+    df.pivot(
+        index='Date',
+        columns=group_by, 
+        values=name
+    ).to_csv(filename, index=True)
+    return df
 
-# Output the ratios to CSV
-full.pivot(
-    index='Date',
-    columns='District Council', 
-    values='Non-Domestic Properties Ratio'
-).to_csv('data/property-vacancy-rates-by-district-council-non-domestic-ratio.csv', index=True)
-
-# %%
-# Calculate ratio of non-domestic properties compared to first period for each council
-first_period = full.sort_values('Date').groupby('District Council')['Number of Vacant Non-Domestic Properties'].transform('first')
-full['Non-Domestic Vacant Properties Ratio'] = (full['Number of Vacant Non-Domestic Properties'] / first_period) - 1
-
-# Output the ratios to CSV
-full.pivot(
-    index='Date',
-    columns='District Council', 
-    values='Non-Domestic Vacant Properties Ratio'
-).to_csv('data/property-vacancy-rates-by-district-council-non-domestic-vacant-ratio.csv', index=True)
+compare_to_start_date(full, 'Number of Non-Domestic Properties', 'District Council', 'Non-Domestic Properties Ratio', 'data/property-vacancy-rates-by-district-council-non-domestic-ratio.csv')
+compare_to_start_date(full, 'Number of Vacant Non-Domestic Properties', 'District Council', 'Non-Domestic Vacant Properties Ratio', 'data/property-vacancy-rates-by-district-council-non-domestic-vacant-ratio.csv')
 
 # %%
 download_file_if_not_exists('https://www.communities-ni.gov.uk/sites/default/files/2025-08/tcd-non-domestic-property-nav-planning-applications-vacancy-rates-floor-space.xlsx', 'data/tcd-non-domestic-property-nav-planning-applications-vacancy-rates-floor-space.xlsx')
@@ -99,6 +86,11 @@ tcd_long['Date'] = pd.to_datetime(tcd_long['Date'], format='%d %B %Y')
 tcd_long.to_csv('data/tcd-non-domestic-property-vacancy-rates.csv')
 
 # %%
-pd.melt(tcd_long, id_vars=['TOWN CENTRE', 'Date'], var_name='Metric', value_name='Value').pivot(index=['Date', 'Metric'], columns='TOWN CENTRE', values='Value')
+tcd_raw = pd.melt(tcd_long, id_vars=['TOWN CENTRE', 'Date'], var_name='Metric', value_name='Value').pivot(index=['Date', 'Metric'], columns='TOWN CENTRE', values='Value')
+tcd_raw.to_csv('data/tcd-non-domestic-property-vacancy-rates-wide.csv')
+
+# %%
+compare_to_start_date(tcd_long, 'No. of Properties', 'TOWN CENTRE', 'Non-Domestic Properties Ratio', 'data/tcd-non-domestic-properties-ratio.csv')
+compare_to_start_date(tcd_long, 'No. of Vacant Properties', 'TOWN CENTRE', 'Non-Domestic Vacant Properties Ratio', 'data/tcd-non-domestic-vacant-properties-ratio.csv')
 
 # %%
