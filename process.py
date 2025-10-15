@@ -51,18 +51,25 @@ full.pivot(
 
 # %%
 # Calculate ratio of non-domestic properties compared to first period for each council
-def compare_to_start_date(df, metric, group_by, name, filename):
-    first_period = df.sort_values('Date').groupby(group_by)[metric].transform('first')
-    df[name] = (df[metric] / first_period) - 1
-    df.pivot(
-        index='Date',
+def compare_to_start_date(df, metrics, group_by, names, filename):
+    for i in range(len(metrics)):
+        first_period = df.sort_values('Date').groupby(group_by)[metrics[i]].transform('first')
+        df[names[i]] = (df[metrics[i]] / first_period) - 1
+    df = pd.melt(
+        df[['Date', group_by] + names], 
+        id_vars=[group_by, 'Date'], 
+        var_name='Metric', 
+        value_name='Value'
+    ).pivot(
+        index=['Date', 'Metric'], 
         columns=group_by, 
-        values=name
-    ).to_csv(filename, index=True)
+        values='Value'
+    )
+    df.to_csv(filename, index=True)
     return df
 
-compare_to_start_date(full, 'Number of Non-Domestic Properties', 'District Council', 'Non-Domestic Properties Ratio', 'data/property-vacancy-rates-by-district-council-non-domestic-ratio.csv')
-compare_to_start_date(full, 'Number of Vacant Non-Domestic Properties', 'District Council', 'Non-Domestic Vacant Properties Ratio', 'data/property-vacancy-rates-by-district-council-non-domestic-vacant-ratio.csv')
+compare_to_start_date(full, ['Number of Non-Domestic Properties'], 'District Council', ['Non-Domestic Properties Ratio'], 'data/property-vacancy-rates-by-district-council-non-domestic-ratio.csv')
+compare_to_start_date(full, ['Number of Vacant Non-Domestic Properties'], 'District Council', ['Non-Domestic Vacant Properties Ratio'], 'data/property-vacancy-rates-by-district-council-non-domestic-vacant-ratio.csv')
 
 # %%
 download_file_if_not_exists('https://www.communities-ni.gov.uk/sites/default/files/2025-08/tcd-non-domestic-property-nav-planning-applications-vacancy-rates-floor-space.xlsx', 'data/tcd-non-domestic-property-nav-planning-applications-vacancy-rates-floor-space.xlsx')
@@ -90,7 +97,6 @@ tcd_raw = pd.melt(tcd_long, id_vars=['TOWN CENTRE', 'Date'], var_name='Metric', 
 tcd_raw.to_csv('data/tcd-non-domestic-property-vacancy-rates-wide.csv')
 
 # %%
-compare_to_start_date(tcd_long, 'No. of Properties', 'TOWN CENTRE', 'Non-Domestic Properties Ratio', 'data/tcd-non-domestic-properties-ratio.csv')
-compare_to_start_date(tcd_long, 'No. of Vacant Properties', 'TOWN CENTRE', 'Non-Domestic Vacant Properties Ratio', 'data/tcd-non-domestic-vacant-properties-ratio.csv')
+compare_to_start_date(tcd_long, ['No. of Properties','No. of Vacant Properties'], 'TOWN CENTRE', ['Change in Properties vs 04/2016', 'Change in Vacant Properties vs 04/2016'], 'data/tcd-non-domestic-properties-ratios.csv')
 
 # %%
