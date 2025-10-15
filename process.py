@@ -22,6 +22,24 @@ def download_file_if_not_exists(url, fname=None, jsonkey=None):
             with open(fname, 'w') as f:
                 json.dump(resp.json().get(jsonkey), f)
 
+# Calculate ratio of metrics compared to first period for each council
+def compare_to_start_date(df, metrics, group_by, names, filename):
+    for i in range(len(metrics)):
+        first_period = df.sort_values('Date').groupby(group_by)[metrics[i]].transform('first')
+        df[names[i]] = (df[metrics[i]] / first_period) - 1
+    df = pd.melt(
+        df[['Date', group_by] + names], 
+        id_vars=[group_by, 'Date'], 
+        var_name='Metric', 
+        value_name='Value'
+    ).pivot(
+        index=['Date', 'Metric'], 
+        columns=group_by, 
+        values='Value'
+    )
+    df.to_csv(filename, index=True)
+    return df
+
 # %%
 dom = pd.read_csv('data/domestic-property-vacancy-rates-by-district-council.csv')
 nondom = pd.read_csv('data/non-domestic-property-vacancy-rates-by-district-council.csv')
@@ -50,24 +68,6 @@ full.pivot(
 ).to_csv('data/property-vacancy-rates-by-district-council-non-domestic-properties.csv', index=True)
 
 # %%
-# Calculate ratio of non-domestic properties compared to first period for each council
-def compare_to_start_date(df, metrics, group_by, names, filename):
-    for i in range(len(metrics)):
-        first_period = df.sort_values('Date').groupby(group_by)[metrics[i]].transform('first')
-        df[names[i]] = (df[metrics[i]] / first_period) - 1
-    df = pd.melt(
-        df[['Date', group_by] + names], 
-        id_vars=[group_by, 'Date'], 
-        var_name='Metric', 
-        value_name='Value'
-    ).pivot(
-        index=['Date', 'Metric'], 
-        columns=group_by, 
-        values='Value'
-    )
-    df.to_csv(filename, index=True)
-    return df
-
 compare_to_start_date(full, ['Number of Non-Domestic Properties'], 'District Council', ['Non-Domestic Properties Ratio'], 'data/property-vacancy-rates-by-district-council-non-domestic-ratio.csv')
 compare_to_start_date(full, ['Number of Vacant Non-Domestic Properties'], 'District Council', ['Non-Domestic Vacant Properties Ratio'], 'data/property-vacancy-rates-by-district-council-non-domestic-vacant-ratio.csv')
 
@@ -88,8 +88,12 @@ tcd.columns = [f"{col[1]} - {col[0]}" if col[0] != '' else col[1] for col in tcd
 tcd_long = pd.wide_to_long(tcd, stubnames=['No. of Properties', 'No. of Vacant Properties', '% of Vacant Properties'], i=['TOWN CENTRE'], j='Date', sep=' - ', suffix='.*').reset_index()
 # Use a proper date format
 tcd_long['Date'] = pd.to_datetime(tcd_long['Date'], format='%d %B %Y')
+# Calculate number of non-vacant properties
+tcd_long['No. of Non-Vacant Properties'] = tcd_long['No. of Properties'] - tcd_long['No. of Vacant Properties']
+# %% Multiply % by 100 for display purposes
+tcd_long['% of Vacant Properties'] = tcd_long['% of Vacant Properties'] * 100
 
-# %%
+# %% Output to CSV
 tcd_long.to_csv('data/tcd-non-domestic-property-vacancy-rates.csv')
 
 # %%
@@ -97,6 +101,9 @@ tcd_raw = pd.melt(tcd_long, id_vars=['TOWN CENTRE', 'Date'], var_name='Metric', 
 tcd_raw.to_csv('data/tcd-non-domestic-property-vacancy-rates-wide.csv')
 
 # %%
-compare_to_start_date(tcd_long, ['No. of Properties','No. of Vacant Properties'], 'TOWN CENTRE', ['Change in Properties vs 04/2016', 'Change in Vacant Properties vs 04/2016'], 'data/tcd-non-domestic-properties-ratios.csv')
+tcd_ratios = compare_to_start_date(tcd_long, ['No. of Properties','No. of Vacant Properties','No. of Non-Vacant Properties'], 'TOWN CENTRE', ['Change in Total', 'Change in Vacant', 'Change in Non-Vacant'], 'data/tcd-non-domestic-properties-ratios.csv').reset_index()
 
+# %%
+most_recent = tcd_ratios[tcd_ratios['Date'] == tcd_ratios['Date'].max()]
+most_recent.drop(columns='Date').set_index('Metric').transpose().to_csv('data/tcd-non-domestic-properties-ratios-latest.csv')
 # %%
